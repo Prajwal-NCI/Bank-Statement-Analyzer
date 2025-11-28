@@ -26,14 +26,15 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Configure AWS credentials
+      - name: Configure AWS credentials (AWS Academy)
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ secrets.AWS_REGION }}
 
-      # ---------- BASIC CHECKS ----------
+      # ---------- LINT / BASIC TESTS ----------
       - name: Install tools
         run: |
           python -m pip install --upgrade pip
@@ -45,7 +46,7 @@ jobs:
       - name: Syntax check
         run: python -m py_compile $(git ls-files '*.py') || true
 
-      # ---------- BUILD & DEPLOY invoice_handler ----------
+      # ---------- BUILD & DEPLOY invoice_handler LAMBDA ----------
       - name: Build invoice_handler Lambda package
         working-directory: lambda/invoice_handler
         run: |
@@ -59,7 +60,7 @@ jobs:
             --function-name "${{ env.LAMBDA_INVOICE_NAME }}" \
             --zip-file fileb://invoice_handler.zip
 
-      # ---------- BUILD & DEPLOY worker ----------
+      # ---------- BUILD & DEPLOY worker LAMBDA ----------
       - name: Build worker Lambda package
         working-directory: lambda/worker
         run: |
@@ -84,15 +85,16 @@ jobs:
           cd frontend
           zip -r ../frontend-bundle.zip . -x "*.git*" "__pycache__/*"
 
-      - name: Upload bundle and create EB version
+      - name: Upload bundle to S3 and create EB version
         run: |
           VERSION_LABEL="build-${{ github.sha }}"
+          S3_KEY="frontend-bundle-${{ github.sha }}.zip"
           aws s3 cp frontend-bundle.zip \
-            "s3://${{ env.EB_DEPLOYMENT_BUCKET }}/frontend-bundle-${{ github.sha }}.zip"
+            "s3://${{ env.EB_DEPLOYMENT_BUCKET }}/${S3_KEY}"
           aws elasticbeanstalk create-application-version \
             --application-name "${{ env.EB_APP_NAME }}" \
             --version-label "$VERSION_LABEL" \
-            --source-bundle S3Bucket="${{ env.EB_DEPLOYMENT_BUCKET }}",S3Key="frontend-bundle-${{ github.sha }}.zip"
+            --source-bundle S3Bucket="${{ env.EB_DEPLOYMENT_BUCKET }}",S3Key="$S3_KEY"
 
       - name: Deploy to Elastic Beanstalk
         run: |
