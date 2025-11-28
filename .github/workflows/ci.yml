@@ -1,0 +1,73 @@
+name: CI - Bank Statement Analyzer
+
+on:
+  push:
+    branches: [ main, dev ]
+  pull_request:
+    branches: [ main, dev ]
+  workflow_dispatch:
+
+jobs:
+  test-and-build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # ---------- BASIC CHECKS ----------
+      - name: Install tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest flake8
+
+      - name: Lint Python (flake8)
+        run: |
+          flake8 . || true
+
+      - name: Syntax check
+        run: |
+          python -m py_compile $(git ls-files '*.py') || true
+
+      # ---------- BUILD invoice_handler LAMBDA ----------
+      - name: Build invoice_handler Lambda package
+        working-directory: lambda/invoice_handler
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -t .
+          zip -r ../../invoice_handler.zip . -x "*.pyc" "__pycache__/*"
+
+      # ---------- BUILD worker LAMBDA ----------
+      - name: Build worker Lambda package
+        working-directory: lambda/worker
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -t .
+          zip -r ../../worker.zip . -x "*.pyc" "__pycache__/*"
+
+      - name: Upload Lambda artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: lambda-zips
+          path: |
+            invoice_handler.zip
+            worker.zip
+
+      # ---------- FRONTEND BUNDLE ----------
+      - name: Build frontend bundle (for Beanstalk)
+        working-directory: frontend
+        run: |
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          cd ..
+          zip -r frontend-bundle.zip frontend -x "*.git*" "__pycache__/*"
+
+      - name: Upload frontend artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-bundle
+          path: frontend-bundle.zip

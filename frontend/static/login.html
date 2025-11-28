@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Login - Bank Statement Analyzer</title>
+<style>
+  :root {
+    --bg: #f3f4f6;
+    --card: #ffffff;
+    --text: #111827;
+    --muted: #6b7280;
+    --accent: #111111;
+    --border: #e5e7eb;
+    --error-bg: #fef2f2;
+    --error-border: #fecaca;
+    --error-text: #7f1d1d;
+    --success-bg: #ecfdf3;
+    --success-border: #bbf7d0;
+    --success-text: #166534;
+    --info-bg: #eff6ff;
+    --info-border: #bfdbfe;
+    --info-text: #1d4ed8;
+  }
+
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+
+  .login-container {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+    width: 100%;
+    max-width: 440px;
+    padding: 32px 28px;
+  }
+
+  h1 {
+    text-align: center;
+    color: var(--text);
+    margin-bottom: 6px;
+    font-size: 24px;
+    font-weight: 700;
+  }
+
+  .subtitle {
+    text-align: center;
+    color: var(--muted);
+    margin-bottom: 24px;
+    font-size: 0.9rem;
+  }
+
+  label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 6px;
+    color: var(--muted);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 0.9rem;
+    margin-bottom: 18px;
+    box-sizing: border-box;
+    background: #ffffff;
+    color: var(--text);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  input::placeholder {
+    color: #9ca3af;
+  }
+
+  input:focus {
+    outline: none;
+    border-color: #111111;
+    box-shadow: 0 0 0 2px rgba(17, 17, 17, 0.12);
+  }
+
+  .btn {
+    width: 100%;
+    padding: 12px;
+    background: var(--accent);
+    color: #ffffff;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s ease, transform 0.15s ease,
+      box-shadow 0.15s ease;
+    margin-top: 4px;
+  }
+
+  .btn:hover:not(:disabled) {
+    background: #333333;
+    transform: translateY(-1px);
+    box-shadow: 0 3px 8px rgba(15, 23, 42, 0.18);
+  }
+
+  .btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+  }
+
+  .status {
+    margin-top: 14px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    display: none;
+    font-weight: 500;
+    font-size: 0.85rem;
+    border: 1px solid transparent;
+  }
+
+  .status.error {
+    background: var(--error-bg);
+    border-color: var(--error-border);
+    color: var(--error-text);
+  }
+
+  .status.success {
+    background: var(--success-bg);
+    border-color: var(--success-border);
+    color: var(--success-text);
+  }
+
+  .status.info {
+    background: var(--info-bg);
+    border-color: var(--info-border);
+    color: var(--info-text);
+  }
+
+  .link-section {
+    text-align: center;
+    margin-top: 18px;
+    color: var(--muted);
+    font-size: 0.85rem;
+  }
+
+  .link-section a {
+    color: var(--accent);
+    text-decoration: none;
+    font-weight: 600;
+  }
+
+  .link-section a:hover {
+    text-decoration: underline;
+  }
+
+  .form-section {
+    display: none;
+  }
+
+  .form-section.active {
+    display: block;
+  }
+
+  .back-link {
+    display: inline-block;
+    margin-bottom: 16px;
+    color: var(--accent);
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 0.8rem;
+  }
+
+  .back-link:hover {
+    text-decoration: underline;
+  }
+
+  @media (max-width: 480px) {
+    .login-container {
+      padding: 24px 18px;
+      border-radius: 10px;
+    }
+
+    h1 {
+      font-size: 20px;
+    }
+  }
+</style>
+
+</head>
+<body>
+<div class="login-container">
+
+  <!-- Login Form -->
+  <div id="loginForm" class="form-section active">
+    <h1>Login</h1>
+    <p class="subtitle">Sign in to your Bank Statement Analyzer account</p>
+
+    <label for="loginEmail">Email</label>
+    <input type="email" id="loginEmail" placeholder="your.email@example.com" />
+
+    <label for="loginPassword">Password</label>
+    <input type="password" id="loginPassword" placeholder="Enter your password" />
+
+    <button class="btn" id="loginBtn">Login</button>
+    <div class="status" id="loginStatus"></div>
+
+    <div class="link-section">
+      <a href="#" onclick="showForgotPassword(); return false;">Forgot password?</a><br /><br />
+      Don't have an account? <a href="signup.html">Sign up</a>
+    </div>
+  </div>
+
+  <!-- Forgot Password Form -->
+  <div id="forgotPasswordForm" class="form-section">
+    <a href="#" class="back-link" onclick="showLogin(); return false;">← Back to login</a>
+    <h1>Reset password</h1>
+    <p class="subtitle">Enter your email and we will send you a verification code</p>
+
+    <label for="forgotEmail">Email</label>
+    <input type="email" id="forgotEmail" placeholder="your.email@example.com" />
+
+    <button class="btn" id="sendCodeBtn">Send verification code</button>
+    <div class="status" id="forgotStatus"></div>
+  </div>
+
+  <!-- Reset Password Form -->
+  <div id="resetPasswordForm" class="form-section">
+    <a href="#" class="back-link" onclick="showLogin(); return false;">← Back to login</a>
+    <h1>Choose a new password</h1>
+    <p class="subtitle">Enter the code sent to your email and your new password</p>
+
+    <label for="verificationCode">Verification code</label>
+    <input type="text" id="verificationCode" placeholder="Enter 6-digit code" />
+
+    <label for="newPasswordReset">New password</label>
+    <input type="password" id="newPasswordReset" placeholder="Enter new password" />
+
+    <label for="confirmPasswordReset">Confirm new password</label>
+    <input type="password" id="confirmPasswordReset" placeholder="Re-enter new password" />
+
+    <button class="btn" id="resetPasswordBtn">Reset password</button>
+    <div class="status" id="resetStatus"></div>
+  </div>
+
+</div>
+
+<script>
+let config = null;
+
+async function loadConfig() {
+  try {
+    const response = await fetch('/api/config');
+    if (!response.ok) throw new Error('Config load failed');
+    config = await response.json();
+    console.log('✅ Config loaded:', config);
+  } catch (error) {
+    console.error('Config error:', error);
+  }
+}
+
+function showStatus(message, type, statusId) {
+  const status = document.getElementById(statusId);
+  status.className = 'status ' + type;
+  status.textContent = message;
+  status.style.display = 'block';
+}
+
+function hideStatus(statusId) {
+  const elem = document.getElementById(statusId);
+  if (elem) elem.style.display = 'none';
+}
+
+function showLogin() {
+  document.getElementById('loginForm').classList.add('active');
+  document.getElementById('forgotPasswordForm').classList.remove('active');
+  document.getElementById('resetPasswordForm').classList.remove('active');
+  hideStatus('forgotStatus');
+  hideStatus('resetStatus');
+}
+
+function showForgotPassword() {
+  document.getElementById('loginForm').classList.remove('active');
+  document.getElementById('forgotPasswordForm').classList.add('active');
+  document.getElementById('resetPasswordForm').classList.remove('active');
+  hideStatus('loginStatus');
+}
+
+function showResetPassword() {
+  document.getElementById('loginForm').classList.remove('active');
+  document.getElementById('forgotPasswordForm').classList.remove('active');
+  document.getElementById('resetPasswordForm').classList.add('active');
+  hideStatus('forgotStatus');
+}
+
+// Login
+document.getElementById('loginBtn').onclick = async function () {
+  const email = document.getElementById('loginEmail').value.trim();
+  const password = document.getElementById('loginPassword').value;
+  const btn = this;
+
+  hideStatus('loginStatus');
+  if (!email || !password) {
+    showStatus('Please enter email and password', 'error', 'loginStatus');
+    return;
+  }
+  if (!config) {
+    showStatus('Loading configuration…', 'info', 'loginStatus');
+    await loadConfig();
+    if (!config) {
+      showStatus('Config load failed', 'error', 'loginStatus');
+      return;
+    }
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Logging in…';
+
+  try {
+    const cognitoEndpoint = `https://cognito-idp.${config.cognito.region}.amazonaws.com/`;
+    const response = await fetch(cognitoEndpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-amz-json-1.1',
+        'X-Amz-Target': 'AWSCognitoIdentityProviderService.InitiateAuth'
+      },
+      body: JSON.stringify({
+        ClientId: config.cognito.clientId,
+        AuthFlow: 'USER_PASSWORD_AUTH',
+        AuthParameters: { USERNAME: email, PASSWORD: password }
+      })
+    });
+    const data = await response.json();
+
+    if (response.ok && data.AuthenticationResult) {
+      localStorage.setItem('accessToken', data.AuthenticationResult.AccessToken);
+      localStorage.setItem('idToken', data.AuthenticationResult.IdToken);
+      localStorage.setItem('refreshToken', data.AuthenticationResult.RefreshToken);
+      localStorage.setItem('userEmail', email);
+
+      showStatus('Login successful. Redirecting…', 'success', 'loginStatus');
+      setTimeout(() => (window.location.href = 'index.html'), 1000);
+    } else {
+      throw new Error(data.message || 'Login failed');
+    }
+  } catch (error) {
+    showStatus('Error: ' + error.message, 'error', 'loginStatus');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Login';
+  }
+};
+
+// Forgot Password Send Code
+document.getElementById('sendCodeBtn').onclick = async function () {
+  const email = document.getElementById('forgotEmail').value.trim();
+  const btn = this;
+
+  hideStatus('forgotStatus');
+  if (!email) {
+    showStatus('Please enter your email', 'error', 'forgotStatus');
+    return;
+  }
+  if (!config) {
+    showStatus('Loading configuration…', 'info', 'forgotStatus');
+    await loadConfig();
+    if (!config) {
+      showStatus('Config load failed', 'error', 'forgotStatus');
+      return;
+    }
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Sending code…';
+
+  try {
+    const cognitoEndpoint = `https://cognito-idp.${config.cognito.region}.amazonaws.com/`;
+    const response = await fetch(cognitoEndpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-amz-json-1.1',
+        'X-Amz-Target': 'AWSCognitoIdentityProviderService.ForgotPassword'
+      },
+      body: JSON.stringify({
+        ClientId: config.cognito.clientId,
+        Username: email
+      })
+    });
+    const data = await response.json();
+
+    if (response.ok) {
+      showStatus('Verification code sent. Check your email.', 'success', 'forgotStatus');
+      localStorage.setItem('resetEmail', email);
+      setTimeout(showResetPassword, 2000);
+    } else {
+      throw new Error(data.message || 'Failed to send code');
+    }
+  } catch (error) {
+    showStatus('Error: ' + error.message, 'error', 'forgotStatus');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Send verification code';
+  }
+};
+
+// Reset Password with Code
+document.getElementById('resetPasswordBtn').onclick = async function () {
+  const code = document.getElementById('verificationCode').value.trim();
+  const newPassword = document.getElementById('newPasswordReset').value;
+  const confirmPassword = document.getElementById('confirmPasswordReset').value;
+  const email = localStorage.getItem('resetEmail');
+  const btn = this;
+
+  hideStatus('resetStatus');
+  if (!code || !newPassword || !confirmPassword) {
+    showStatus('Please fill in all fields', 'error', 'resetStatus');
+    return;
+  }
+  if (newPassword !== confirmPassword) {
+    showStatus('Passwords do not match', 'error', 'resetStatus');
+    return;
+  }
+  if (newPassword.length < 8) {
+    showStatus('Password must be at least 8 characters', 'error', 'resetStatus');
+    return;
+  }
+
+  if (!config) {
+    showStatus('Loading configuration…', 'info', 'resetStatus');
+    await loadConfig();
+    if (!config) {
+      showStatus('Config load failed', 'error', 'resetStatus');
+      return;
+    }
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Resetting password…';
+
+  try {
+    const cognitoEndpoint = `https://cognito-idp.${config.cognito.region}.amazonaws.com/`;
+    const response = await fetch(cognitoEndpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-amz-json-1.1',
+        'X-Amz-Target': 'AWSCognitoIdentityProviderService.ConfirmForgotPassword'
+      },
+      body: JSON.stringify({
+        ClientId: config.cognito.clientId,
+        Username: email,
+        ConfirmationCode: code,
+        Password: newPassword
+      })
+    });
+    const data = await response.json();
+
+    if (response.ok) {
+      showStatus('Password reset successfully. Redirecting to login…', 'success', 'resetStatus');
+      localStorage.removeItem('resetEmail');
+      setTimeout(showLogin, 2000);
+    } else {
+      throw new Error(data.message || 'Password reset failed');
+    }
+  } catch (error) {
+    showStatus('Error: ' + error.message, 'error', 'resetStatus');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Reset password';
+  }
+};
+
+loadConfig();
+</script>
+</body>
+</html>
