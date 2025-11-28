@@ -1,14 +1,20 @@
-name: CI - Bank Statement Analyzer
+name: CI/CD - Bank Statement Analyzer
 
 on:
   push:
-    branches: [ main, dev ]
-  pull_request:
-    branches: [ main, dev ]
+    branches: [ main ]
   workflow_dispatch:
 
+env:
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  EB_APP_NAME: ${{ secrets.EB_APP_NAME }}
+  EB_ENV_NAME: ${{ secrets.EB_ENV_NAME }}
+  LAMBDA_INVOICE_NAME: ${{ secrets.LAMBDA_INVOICE_NAME }}
+  LAMBDA_WORKER_NAME: ${{ secrets.LAMBDA_WORKER_NAME }}
+  EB_DEPLOYMENT_BUCKET: ${{ secrets.EB_DEPLOYMENT_BUCKET }}
+
 jobs:
-  test-and-build:
+  build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
@@ -20,21 +26,26 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
       # ---------- BASIC CHECKS ----------
       - name: Install tools
         run: |
           python -m pip install --upgrade pip
           pip install pytest flake8
 
-      - name: Lint Python (flake8)
-        run: |
-          flake8 . || true
+      - name: Lint Python
+        run: flake8 . || true
 
       - name: Syntax check
-        run: |
-          python -m py_compile $(git ls-files '*.py') || true
+        run: python -m py_compile $(git ls-files '*.py') || true
 
-      # ---------- BUILD invoice_handler LAMBDA ----------
+      # ---------- BUILD & DEPLOY invoice_handler ----------
       - name: Build invoice_handler Lambda package
         working-directory: lambda/invoice_handler
         run: |
@@ -42,7 +53,13 @@ jobs:
           pip install -r requirements.txt -t .
           zip -r ../../invoice_handler.zip . -x "*.pyc" "__pycache__/*"
 
-      # ---------- BUILD worker LAMBDA ----------
+      - name: Update invoice_handler Lambda
+        run: |
+          aws lambda update-function-code \
+            --function-name "${{ env.LAMBDA_INVOICE_NAME }}" \
+            --zip-file fileb://invoice_handler.zip
+
+      # ---------- BUILD & DEPLOY worker ----------
       - name: Build worker Lambda package
         working-directory: lambda/worker
         run: |
@@ -50,24 +67,37 @@ jobs:
           pip install -r requirements.txt -t .
           zip -r ../../worker.zip . -x "*.pyc" "__pycache__/*"
 
-      - name: Upload Lambda artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: lambda-zips
-          path: |
-            invoice_handler.zip
-            worker.zip
+      - name: Update worker Lambda
+        run: |
+          aws lambda update-function-code \
+            --function-name "${{ env.LAMBDA_WORKER_NAME }}" \
+            --zip-file fileb://worker.zip
 
-      # ---------- FRONTEND BUNDLE ----------
-      - name: Build frontend bundle (for Beanstalk)
+      # ---------- BUILD & DEPLOY FRONTEND TO BEANSTALK ----------
+      - name: Install frontend dependencies
         working-directory: frontend
         run: |
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-          cd ..
-          zip -r frontend-bundle.zip frontend -x "*.git*" "__pycache__/*"
 
-      - name: Upload frontend artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: frontend-bundle
-          path: frontend-bundle.zip
+      - name: Package frontend
+        run: |
+          cd frontend
+          zip -r ../frontend-bundle.zip . -x "*.git*" "__pycache__/*"
+
+      - name: Upload bundle and create EB version
+        run: |
+          VERSION_LABEL="build-${{ github.sha }}"
+          aws s3 cp frontend-bundle.zip \
+            "s3://${{ env.EB_DEPLOYMENT_BUCKET }}/frontend-bundle-${{ github.sha }}.zip"
+          aws elasticbeanstalk create-application-version \
+            --application-name "${{ env.EB_APP_NAME }}" \
+            --version-label "$VERSION_LABEL" \
+            --source-bundle S3Bucket="${{ env.EB_DEPLOYMENT_BUCKET }}",S3Key="frontend-bundle-${{ github.sha }}.zip"
+
+      - name: Deploy to Elastic Beanstalk
+        run: |
+          VERSION_LABEL="build-${{ github.sha }}"
+          aws elasticbeanstalk update-environment \
+            --application-name "${{ env.EB_APP_NAME }}" \
+            --environment-name "${{ env.EB_ENV_NAME }}" \
+            --version-label "$VERSION_LABEL"
