@@ -19,7 +19,7 @@ except ImportError:
 s3_client = boto3.client('s3')
 dynamo = boto3.resource('dynamodb')
 
-# READ FROM ENVIRONMENT VARIABLES
+# READs FROM ENVIRONMENT VARIABLES
 S3_BUCKET = os.environ.get('S3_BUCKET_NAME', 'invoice-management-bucket-prajwal-nci')
 USER_ANALYSES_TABLE = os.environ.get('DYNAMODB_TABLE_NAME', 'user_analyses')
 
@@ -64,7 +64,7 @@ def lambda_handler(event, context):
         return error_response(f'Internal server error: {str(e)}', 500)
 
 
-# -------------------- FILE UPLOAD / DELETE --------------------
+#FILE UPLOAD / DELETE
 
 
 def handle_upload(event):
@@ -89,7 +89,7 @@ def handle_upload(event):
             ContentType=content_type
         )
 
-        print(f'✅ File uploaded: s3://{S3_BUCKET}/{filename}')
+        print(f'File uploaded: s3://{S3_BUCKET}/{filename}')
 
         return success_response({
             'message': 'File uploaded successfully',
@@ -116,7 +116,7 @@ def handle_delete_file(event):
 
         s3_client.delete_object(Bucket=bucket, Key=key)
 
-        print(f'✅ File deleted: s3://{bucket}/{key}')
+        print(f'File deleted: s3://{bucket}/{key}')
 
         return success_response({
             'message': 'File deleted successfully',
@@ -129,9 +129,6 @@ def handle_delete_file(event):
         import traceback
         traceback.print_exc()
         return error_response(f'Delete failed: {str(e)}', 500)
-
-
-# -------------------- BANK ANALYZE --------------------
 
 
 def handle_bank_analyze(event):
@@ -270,8 +267,6 @@ def handle_bank_analyze(event):
             'category_summary': by_category,
         }
 
-        print(f'✅ Analysis complete: {len(enriched)} transactions processed')
-
         return success_response(result)
 
     except Exception as e:
@@ -281,7 +276,7 @@ def handle_bank_analyze(event):
         return error_response(f'Analysis failed: {str(e)}', 500)
 
 
-# -------------------- SAVE / LIST / DELETE ANALYSES --------------------
+# SAVE / LIST / DELETE ANALYSES
 
 
 def handle_save_analysis(event):
@@ -320,7 +315,7 @@ def handle_save_analysis(event):
                 except Exception:
                     saved_formatted = str(existing_item['saved_at'])
 
-                print(f'ℹ️ Duplicate found for {user_email}')
+                print(f'Duplicate found for {user_email}')
 
                 return success_response({
                     'message': 'This analysis was already saved previously',
@@ -358,7 +353,7 @@ def handle_save_analysis(event):
         except Exception:
             saved_formatted = saved_at
 
-        print(f'✅ Analysis saved for {user_email}: {analysis_id}')
+        print(f'Analysis saved for {user_email}: {analysis_id}')
 
         return success_response({
             'message': 'Analysis saved successfully',
@@ -408,7 +403,7 @@ def handle_get_user_analyses(event):
             if 'category_summary' in item:
                 item['category_summary'] = convert_decimal_to_float(item['category_summary'])
 
-        print(f'✅ Retrieved {len(items)} analyses for {user_email}')
+        print(f'Retrieved {len(items)} analyses for {user_email}')
 
         return success_response({
             'analyses': items,
@@ -440,7 +435,7 @@ def handle_delete_analysis(event):
             }
         )
 
-        print(f'✅ Deleted analysis {analysis_id} for {user_email}')
+        print(f'Deleted analysis {analysis_id} for {user_email}')
 
         return success_response({
             'message': 'Analysis deleted successfully',
@@ -454,7 +449,7 @@ def handle_delete_analysis(event):
         return error_response(f'Delete failed: {str(e)}', 500)
 
 
-# -------------------- PDF & PARSING --------------------
+# PDF & Processing
 
 
 def extract_text_from_pdf(pdf_bytes):
@@ -475,7 +470,7 @@ def extract_text_from_pdf(pdf_bytes):
         if not text.strip():
             raise Exception('No text content found in PDF')
 
-        print(f'✅ Extracted {len(text)} characters from PDF')
+        print(f'Extracted {len(text)} characters from PDF')
         return text
 
     except Exception as e:
@@ -483,29 +478,20 @@ def extract_text_from_pdf(pdf_bytes):
 
 
 def parse_transactions(content):
-    """
-    Parses transactions from multiple Irish bank statement formats:
-    1. CSV format: date, description, amount
-    2. Revolut/N26 style: "01 Nov 2025 TESCO -€25.50"
-    3. AIB/BOI style: "01/11/2025 TESCO DUBLIN €25.50"
-    4. Generic ISO: "2025-11-01 TESCO €25.50"
-    """
     transactions = []
     lines = content.splitlines()
 
-    print(f"📄 Parsing {len(lines)} lines from statement...")
+    print(f"Parsing {len(lines)} lines from statement...")
 
     for line_num, raw_line in enumerate(lines, 1):
         line = raw_line.strip()
         if not line or line.startswith('#'):
             continue
 
-        # Skip pure header lines
         if any(k in line.lower() for k in ['date', 'description', 'amount', 'balance', 'transaction']) \
                 and not any(ch.isdigit() for ch in line):
             continue
 
-        # ------------ FORMAT 1: CSV ------------
         if ',' in line:
             parts = [p.strip() for p in line.split(',')]
             if len(parts) >= 3:
@@ -520,7 +506,6 @@ def parse_transactions(content):
                 if amount is None:
                     continue
 
-                # Parse date
                 dt = None
                 for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%Y-%m-%dT%H:%M:%S"):
                     try:
@@ -543,7 +528,6 @@ def parse_transactions(content):
                 })
                 continue
 
-        # ------------ FORMATS 2/3/4: free text ------------
         date_patterns = [
             (r'(\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+202[0-9])', '%d %b %Y'),
             (r'(\d{1,2}/\d{1,2}/202[0-9])', '%d/%m/%Y'),
@@ -586,7 +570,6 @@ def parse_transactions(content):
         if amount is None:
             continue
 
-        # Remove date and amount to get description
         desc_line = line
         for pattern, _fmt in date_patterns:
             desc_line = re.sub(pattern, '', desc_line, flags=re.IGNORECASE)
@@ -605,9 +588,9 @@ def parse_transactions(content):
             'gross_amount': round(abs(amount), 2),
         })
 
-        print(f"  ✅ Line {line_num}: {dt.date()} | {desc[:30]} | €{abs(amount):.2f}")
+        print(f" Line {line_num}: {dt.date()} | {desc[:30]} | €{abs(amount):.2f}")
 
-    print(f"🔢 Found {len(transactions)} transactions")
+    print(f"Found {len(transactions)} transactions")
     return transactions
 
 
@@ -655,8 +638,6 @@ def categorize_expense(description):
 
     return 'Other'
 
-
-# -------------------- CONVERSIONS & RESPONSES --------------------
 
 
 def convert_floats_to_decimal(obj):

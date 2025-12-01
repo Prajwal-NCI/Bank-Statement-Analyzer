@@ -16,11 +16,9 @@ dynamo = boto3.resource('dynamodb')
 DYNAMODB_TABLE = 'user_analyses'
 
 def lambda_handler(event, context):
-    """Process PDF analysis messages from SQS"""
-    
+
     for record in event['Records']:
         try:
-            # Parse SQS message
             message = json.loads(record['body'])
             
             bucket = message['bucket']
@@ -29,36 +27,31 @@ def lambda_handler(event, context):
             user_email = message['user_email']
             file_name = message['file_name']
             
-            print(f"📥 Processing: {file_name} for {user_email}")
+            print(f"Processing: {file_name} for {user_email}")
             
-            # Download PDF from S3
+            # this part download PDF from S3
             response = s3_client.get_object(Bucket=bucket, Key=key)
             pdf_bytes = response['Body'].read()
             
-            print(f"📄 Downloaded {len(pdf_bytes)} bytes from S3")
+            print(f"Downloaded {len(pdf_bytes)} bytes from S3")
             
             # Analyze PDF
             analysis_result = analyze_pdf(pdf_bytes, country_code)
             
-            print(f"✅ Analysis complete: {analysis_result.get('transaction_count', 0)} transactions")
+            print(f"Analysis complete: {analysis_result.get('transaction_count', 0)} transactions")
             
             # Save to DynamoDB
             save_analysis_to_dynamo(user_email, file_name, analysis_result, country_code)
             
-            print(f"✅ Saved to DynamoDB for {user_email}")
+            print(f"Saved to DynamoDB for {user_email}")
             
         except Exception as e:
-            print(f"❌ Error processing message: {str(e)}")
+            print(f"Error processing message: {str(e)}")
             import traceback
             traceback.print_exc()
-            raise  # Re-raise to keep message in queue for retry
+            raise
 
-
-# ============================================================================
-# PDF ANALYSIS FUNCTIONS
-# ============================================================================
 def analyze_pdf(pdf_bytes, country_code):
-    """Analyze PDF and return structured data"""
     try:
         # Extract text from PDF
         pdf_reader = PyPDF2.PdfReader(BytesIO(pdf_bytes))
@@ -66,11 +59,10 @@ def analyze_pdf(pdf_bytes, country_code):
         for page in pdf_reader.pages:
             text += page.extract_text()
         
-        print(f"📝 Extracted {len(text)} characters from PDF")
-        
-        # Parse transactions
+        print(f"Extracted {len(text)} characters from PDF")
+
         transactions = parse_transactions(text)
-        print(f"🔢 Found {len(transactions)} transactions")
+        print(f"Found {len(transactions)} transactions")
         
         if not transactions:
             return {
@@ -80,25 +72,22 @@ def analyze_pdf(pdf_bytes, country_code):
                 'monthly_summary': {},
                 'category_summary': {}
             }
-        
-        # Calculate analysis with VAT
+
         calculator = TaxCalculator()
         analysis = calculate_analysis(transactions, calculator, country_code)
         
         return analysis
         
     except Exception as e:
-        print(f"❌ PDF analysis error: {str(e)}")
+        print(f"PDF analysis error: {str(e)}")
         raise
 
 
 def parse_transactions(text):
-    """Parse transactions from bank statement text"""
     transactions = []
     lines = text.split('\n')
     
     for line in lines:
-        # Match patterns like: "01 Nov Amazon -50.00"
         match = re.search(r'(\d{1,2}\s+\w{3})\s+(.+?)\s+([-]?\d+\.\d{2})', line)
         if match:
             date_str, description, amount_str = match.groups()
@@ -116,7 +105,6 @@ def parse_transactions(text):
 
 
 def categorize(description):
-    """Categorize transaction based on description"""
     desc_lower = description.lower()
     
     if any(word in desc_lower for word in ['amazon', 'shop', 'store', 'retail']):
@@ -134,21 +122,17 @@ def categorize(description):
 
 
 def calculate_analysis(transactions, calculator, country_code):
-    """Calculate spending analysis with VAT"""
     monthly_summary = {}
     category_summary = {}
     
     for tx in transactions:
         amount = tx['amount']
         category = tx['category']
-        
-        # Extract VAT from gross amount
+
         vat, net = calculator.extract_vat(amount, country_code)
-        
-        # Get month
-        month = tx['date'].split()[1]  # e.g., "Nov"
-        
-        # Update monthly summary
+
+        month = tx['date'].split()[1]
+
         if month not in monthly_summary:
             monthly_summary[month] = {
                 'net_total': 0,
@@ -164,8 +148,7 @@ def calculate_analysis(transactions, calculator, country_code):
         if category not in monthly_summary[month]['by_category']:
             monthly_summary[month]['by_category'][category] = 0
         monthly_summary[month]['by_category'][category] += amount
-        
-        # Update category summary
+
         if category not in category_summary:
             category_summary[category] = {
                 'net': 0,
@@ -202,14 +185,9 @@ def calculate_analysis(transactions, calculator, country_code):
     }
 
 
-# ============================================================================
-# SAVE TO DYNAMODB
-# ============================================================================
 def save_analysis_to_dynamo(user_email, file_name, analysis, country_code):
-    """Save analysis results to DynamoDB"""
     table = dynamo.Table(DYNAMODB_TABLE)
-    
-    # Calculate totals
+
     monthly = analysis.get('monthly_summary', {})
     total_net = sum(float(m.get('net_total', 0)) for m in monthly.values())
     total_vat = sum(float(m.get('vat_total', 0)) for m in monthly.values())
@@ -233,11 +211,10 @@ def save_analysis_to_dynamo(user_email, file_name, analysis, country_code):
     }
     
     table.put_item(Item=item)
-    print(f"✅ Analysis saved: {analysis_id}")
+    print(f"Analysis saved: {analysis_id}")
 
 
 def convert_to_decimal(obj):
-    """Convert floats to Decimal for DynamoDB"""
     if isinstance(obj, dict):
         return {k: convert_to_decimal(v) for k, v in obj.items()}
     elif isinstance(obj, list):
