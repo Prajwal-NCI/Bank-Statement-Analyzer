@@ -26,7 +26,7 @@ sqs_client = boto3.client('sqs')
 # Environment variables for resource names
 S3_BUCKET = os.environ.get('S3_BUCKET_NAME', 'invoice-management-bucket-prajwal-nci')
 USER_ANALYSES_TABLE = os.environ.get('DYNAMODB_TABLE_NAME', 'user_analyses')
-SQS_QUEUE_URL = os.environ.get('SQS_QUEUE_URL', 'https://sqs.us-east-1.amazonaws.com/YOUR_ACCOUNT_ID/BankStatementAnalysisQueue')
+SQS_QUEUE_URL = os.environ.get('SQS_QUEUE_URL', 'https://sqs.us-east-1.amazonaws.com/556192680160/BankStatementAnalysisQueue')
 
 def lambda_handler(event, context):
     """
