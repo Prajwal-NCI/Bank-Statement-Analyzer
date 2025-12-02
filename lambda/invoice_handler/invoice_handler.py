@@ -448,18 +448,28 @@ def parse_transactions(content):
         if not line or line.startswith('#'):
             continue
         
-        # Skip headers like "Date Description Money out Money in Balance"
-        if any(k in line.lower() for k in ['date', 'description', 'money out', 'money in', 'balance']) \
+        # Skip headers
+        if any(k in line.lower() for k in ['date', 'description', 'amount', 'balance', 'transaction', 'account', 'opening', 'closing']) \
            and not any(ch.isdigit() for ch in line):
             continue
         
+        # CRITICAL: Skip any line that is a credit/top-up
+        if any(word in line.lower() for word in ['top-up', 'money in', 'credit', 'deposit', 'from:', 'apple pay']):
+            continue
+        
+        # CSV format: Date, Description, Money out
         if ',' in line:
             parts = [p.strip() for p in line.split(',')]
             if len(parts) >= 3:
                 date_str = parts[0]
-                desc = parts[1] if len(parts) > 1 else 'Transaction'
-                money_out_str = parts[2] if len(parts) > 2 else ''
-                money_in_str = parts[3] if len(parts) > 3 else ''
+                desc = parts[1]
+                try:
+                    amount = float(parts[2].replace('€', '').replace(',', '.'))
+                except (ValueError, IndexError):
+                    amount = None
+                
+                if amount is None:
+                    continue
                 
                 dt = None
                 for fmt in ("%d %b %Y", "%Y-%m-%d", "%d/%m/%Y"):
@@ -475,49 +485,31 @@ def parse_transactions(content):
                     except Exception:
                         continue
                 
-                # CRITICAL FIX: Only process if "Money out" column has a value 
-                # Ignore if "Money in" column is used (credit/top-up)
-                try:
-                    # Clean currency symbols and spaces
-                    money_out_clean = money_out_str.replace('€', '').replace(',', '.').strip()
-                    money_in_clean = money_in_str.replace('€', '').replace(',', '.').strip()
-                    
-                    # If Money out has value, it's a debit then it will process it
-                    if money_out_clean:
-                        amount = float(money_out_clean)
-                        month_key = dt.strftime('%Y-%m')
-                        transactions.append({
-                            'date': dt.date().isoformat(),
-                            'month': month_key,
-                            'description': desc[:100],
-                            'gross_amount': round(abs(amount), 2),
-                            'type': 'debit'
-                        })
-                    # If Money in has value but Money out dont, skip it
-                    elif money_in_clean:
-                        continue
-                        
-                except (ValueError, IndexError):
-                    continue
+                month_key = dt.strftime('%Y-%m')
+                transactions.append({
+                    'date': dt.date().isoformat(),
+                    'month': month_key,
+                    'description': desc if desc else 'Transaction',
+                    'gross_amount': round(abs(amount), 2),
+                })
                 continue
-
+        
+        # Fallback: Parse free-text format
         date_patterns = [
             (r'(\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+202[0-9])', '%d %b %Y'),
             (r'(\d{1,2}/\d{1,2}/202[0-9])', '%d/%m/%Y'),
             (r'(202[0-9]-\d{2}-\d{2})', '%Y-%m-%d'),
         ]
         
-        # Amount patterns - ONLY capture negative amounts
         amount_patterns = [
-            r'-€\s*(\d+[.,]\d{2})', 
-            r'-\s*(\d+[.,]\d{2})\s*€', 
-            r'Money out[:\s]*€?\s*(\d+[.,]\d{2})',
+            r'-?€\s*(\d+[.,]\d{2})',
+            r'-?\s*(\d+[.,]\d{2})\s*€',
+            r'-?\s*(\d+[.,]\d{2})',
         ]
         
         dt = None
         date_str = None
         
-
         for pattern, fmt in date_patterns:
             m = re.search(pattern, line, re.IGNORECASE)
             if m:
@@ -531,7 +523,6 @@ def parse_transactions(content):
         if not dt:
             continue
         
-        # Try to extract only negative/debit amounts
         amount = None
         for pattern in amount_patterns:
             m = re.search(pattern, line)
@@ -546,11 +537,6 @@ def parse_transactions(content):
         if amount is None:
             continue
         
-        # Check that this line is not a credit/top-up line
-        if any(word in line.lower() for word in ['top-up', 'money in', 'credit', 'deposit']):
-            continue
-        
-        # Extract description (remove date and amount)
         desc_line = line
         for pattern, _fmt in date_patterns:
             desc_line = re.sub(pattern, '', desc_line, flags=re.IGNORECASE)
@@ -567,7 +553,6 @@ def parse_transactions(content):
             'month': month_key,
             'description': desc[:100],
             'gross_amount': round(abs(amount), 2),
-            'type': 'debit'
         })
     
     return transactions
