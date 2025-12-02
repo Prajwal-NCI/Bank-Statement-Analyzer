@@ -7,49 +7,31 @@ from io import BytesIO
 import base64
 from decimal import Decimal
 
-# Custom VAT calculation package
-from invoice_tax_pkg import TaxCalculator
-
-# PDF parsing support
 try:
     import PyPDF2
     PDF_SUPPORT = True
 except ImportError:
     PDF_SUPPORT = False
 
-# AWS service clients and resources
+try:
+    from invoice_tax_pkg import TaxCalculator
+except ImportError:
+    TaxCalculator = None
+
 s3_client = boto3.client('s3')
 dynamo = boto3.resource('dynamodb')
 sqs_client = boto3.client('sqs')
 
-# Environment variables for resource names
 S3_BUCKET = os.environ.get('S3_BUCKET_NAME', 'invoice-management-bucket-prajwal-nci')
 USER_ANALYSES_TABLE = os.environ.get('DYNAMODB_TABLE_NAME', 'user_analyses')
 SQS_QUEUE_URL = os.environ.get('SQS_QUEUE_URL', 'https://sqs.us-east-1.amazonaws.com/556192680160/BankStatementAnalysisQueue')
 
 def lambda_handler(event, context):
-    """
-    Main Lambda entrypoint: API Gateway calls this function.
-    Routes requests to appropriate handlers based on resource path and HTTP method.
-    """
     try:
-        path = event.get('resource', '')
-        method = event.get('httpMethod', '')
-
-        # Route requests to appropriate handlers
-        if path == '/bank/analyze' and method == 'POST':
-            return handle_bank_analyze(event)
-        elif path == '/upload' and method == 'POST':
-            return handle_upload(event)
-        elif path == '/delete' and method == 'POST':
-            return handle_delete_file(event)
-        elif path == '/bank/save-analysis' and method == 'POST':
-            return handle_save_analysis(event)
-        elif path == '/bank/my-analyses' and method == 'POST':
-            return handle_get_user_analyses(event)
-        elif path == '/bank/delete-analysis' and method == 'POST':
-            return handle_delete_analysis(event)
-        elif path == '/health' and method == 'GET':
+        http_method = event.get('httpMethod', '')
+        path = event.get('path', '')
+        
+        if path == '/health' and http_method == 'GET':
             return success_response({
                 'status': 'healthy',
                 'service': 'bank-analyzer-api',
@@ -59,21 +41,24 @@ def lambda_handler(event, context):
                 'sqs_queue': SQS_QUEUE_URL,
                 'timestamp': datetime.utcnow().isoformat()
             })
+        elif path == '/upload' and http_method == 'POST':
+            return handle_upload(event)
+        elif path == '/delete' and http_method == 'POST':
+            return handle_delete_file(event)
+        elif path == '/bank/analyze' and http_method == 'POST':
+            return handle_bank_analyze(event)
+        elif path == '/bank/save-analysis' and http_method == 'POST':
+            return handle_save_analysis(event)
+        elif path == '/bank/my-analyses' and http_method == 'POST':
+            return handle_get_user_analyses(event)
+        elif path == '/bank/delete-analysis' and http_method == 'POST':
+            return handle_delete_analysis(event)
         else:
-            return error_response('Unknown endpoint: {} {}'.format(method, path), 404)
-
+            return error_response('Unknown endpoint', 404)
     except Exception as e:
         return error_response('Internal server error: {}'.format(str(e)), 500)
 
-# =============== FILE UPLOAD AND DELETE ===============
-
 def handle_upload(event):
-    """
-    Handles file upload to S3.
-    - Receives base64-encoded file from frontend
-    - Decodes and uploads to S3 bucket
-    - Returns S3 location
-    """
     try:
         body = json.loads(event.get('body') or '{}')
         filename = body.get('filename', '').strip()
@@ -106,9 +91,6 @@ def handle_upload(event):
         return error_response('Upload failed: {}'.format(str(e)), 500)
 
 def handle_delete_file(event):
-    """
-    Handles deletion of a file from S3.
-    """
     try:
         body = json.loads(event.get('body') or '{}')
         bucket = body.get('bucket', '').strip()
@@ -128,20 +110,7 @@ def handle_delete_file(event):
     except Exception as e:
         return error_response('Delete failed: {}'.format(str(e)), 500)
 
-# =============== BANK STATEMENT ANALYSIS WITH SQS ===============
-
 def handle_bank_analyze(event):
-    """
-    Handles bank statement analysis request.
-    
-    ASYNCHRONOUS WORKFLOW:
-    1. Receives analysis request from frontend
-    2. Sends message to SQS queue (fast)
-    3. Returns 202 "Accepted" immediately
-    4. lambda2-worker.py picks up from SQS
-    5. Worker processes PDF asynchronously
-    6. Results saved to DynamoDB
-    """
     try:
         body = json.loads(event.get('body') or '{}')
         bucket = body.get('bucket', '').strip()
@@ -177,18 +146,13 @@ def handle_bank_analyze(event):
             'file': key,
             'user_email': user_email,
             'message_id': message_id,
-            'note': 'Your file is being analyzed in the background. Please check "My Analyses" in 30-60 seconds for results.'
+            'note': 'Check back in 30-60 seconds for results'
         }, 202)
 
     except Exception as e:
         return error_response('Analysis failed: {}'.format(str(e)), 500)
 
-# =============== DYNAMODB: SAVE, FETCH, DELETE ===============
-
 def handle_save_analysis(event):
-    """
-    Saves completed analysis to DynamoDB.
-    """
     try:
         body = json.loads(event.get('body') or '{}')
         user_email = body.get('user_email', '').strip()
@@ -271,9 +235,6 @@ def handle_save_analysis(event):
         return error_response('Save failed: {}'.format(str(e)), 500)
 
 def handle_get_user_analyses(event):
-    """
-    Retrieves all analyses for a user from DynamoDB.
-    """
     try:
         body = json.loads(event.get('body') or '{}')
         user_email = body.get('user_email', '').strip()
@@ -315,9 +276,6 @@ def handle_get_user_analyses(event):
         return error_response('Fetch failed: {}'.format(str(e)), 500)
 
 def handle_delete_analysis(event):
-    """
-    Deletes a specific analysis from DynamoDB.
-    """
     try:
         body = json.loads(event.get('body') or '{}')
         user_email = body.get('user_email', '').strip()
@@ -327,12 +285,7 @@ def handle_delete_analysis(event):
             return error_response('user_email and analysis_id required', 400)
 
         table = dynamo.Table(USER_ANALYSES_TABLE)
-        table.delete_item(
-            Key={
-                'user_email': user_email,
-                'analysis_id': analysis_id
-            }
-        )
+        table.delete_item(Key={'user_email': user_email, 'analysis_id': analysis_id})
         
         return success_response({
             'message': 'Analysis deleted successfully',
@@ -342,208 +295,7 @@ def handle_delete_analysis(event):
     except Exception as e:
         return error_response('Delete failed: {}'.format(str(e)), 500)
 
-# =============== PDF PARSING AND TRANSACTION EXTRACTION ===============
-
-def extract_text_from_pdf(pdf_bytes):
-    """
-    Extracts all text content from a PDF file using PyPDF2.
-    Handles multi-page PDFs.
-    """
-    try:
-        pdf_file = BytesIO(pdf_bytes)
-        reader = PyPDF2.PdfReader(pdf_file)
-        text = ''
-        
-        for page_num, page in enumerate(reader.pages):
-            try:
-                page_text = page.extract_text()
-                if page_text:
-                    text += page_text + '\n'
-            except Exception:
-                continue
-        
-        if not text.strip():
-            raise Exception('No text content found in PDF')
-        
-        return text
-
-    except Exception as e:
-        raise Exception('PDF extraction failed: {}'.format(str(e)))
-
-def parse_transactions(content):
-    """
-    Parse bank statement transactions from PDF text.
-    
-    Only captures DEBIT transactions (Money out)
-    Ignores credits (Money in) like top-ups
-    Handles both CSV and free-text formats
-    Supports multiple date/amount formats
-    """
-    transactions = []
-    lines = content.splitlines()
-    
-    for line_num, raw_line in enumerate(lines, 1):
-        line = raw_line.strip()
-        
-        if not line or line.startswith('#'):
-            continue
-        
-        if any(k in line.lower() for k in ['date', 'description', 'money out', 'money in', 'balance', 'account', 'opening', 'closing', 'statement']) \
-           and not any(ch.isdigit() for ch in line):
-            continue
-        
-        if any(word in line.lower() for word in ['top-up', 'money in', 'credit', 'deposit', 'from:', 'apple pay', 'transfer in']):
-            continue
-        
-        if ',' in line:
-            parts = [p.strip() for p in line.split(',')]
-            if len(parts) >= 3:
-                date_str = parts[0]
-                desc = parts[1]
-                try:
-                    amount = float(parts[2].replace('EUR', '').replace('EUR', '').replace(',', '.'))
-                except (ValueError, IndexError):
-                    amount = None
-                
-                if amount is None:
-                    continue
-                
-                dt = None
-                for fmt in ("%d %b %Y", "%Y-%m-%d", "%d/%m/%Y"):
-                    try:
-                        dt = datetime.strptime(date_str, fmt)
-                        break
-                    except Exception:
-                        continue
-                
-                if not dt:
-                    try:
-                        dt = datetime.fromisoformat(date_str)
-                    except Exception:
-                        continue
-                
-                month_key = dt.strftime('%Y-%m')
-                transactions.append({
-                    'date': dt.date().isoformat(),
-                    'month': month_key,
-                    'description': desc if desc else 'Transaction',
-                    'gross_amount': round(abs(amount), 2),
-                })
-                continue
-        
-        date_patterns = [
-            (r'(\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+202[0-9])', '%d %b %Y'),
-            (r'(\d{1,2}/\d{1,2}/202[0-9])', '%d/%m/%Y'),
-            (r'(202[0-9]-\d{2}-\d{2})', '%Y-%m-%d'),
-        ]
-        
-        amount_patterns = [
-            r'-?EUR\s*(\d+[.,]\d{2})',
-            r'-?\s*(\d+[.,]\d{2})\s*EUR',
-            r'-?\s*(\d+[.,]\d{2})',
-        ]
-        
-        dt = None
-        date_str = None
-        
-        for pattern, fmt in date_patterns:
-            m = re.search(pattern, line, re.IGNORECASE)
-            if m:
-                date_str = m.group(1)
-                try:
-                    dt = datetime.strptime(date_str, fmt)
-                    break
-                except Exception:
-                    continue
-        
-        if not dt:
-            continue
-        
-        amount = None
-        for pattern in amount_patterns:
-            m = re.search(pattern, line)
-            if m:
-                try:
-                    amt_str = m.group(1).replace(',', '.')
-                    amount = float(amt_str)
-                    break
-                except Exception:
-                    continue
-        
-        if amount is None:
-            continue
-        
-        desc_line = line
-        for pattern, _fmt in date_patterns:
-            desc_line = re.sub(pattern, '', desc_line, flags=re.IGNORECASE)
-        for pattern in amount_patterns:
-            desc_line = re.sub(pattern, '', desc_line)
-        
-        desc = re.sub(r'\s+', ' ', desc_line).strip()
-        if not desc or len(desc) < 2:
-            desc = 'Transaction'
-        
-        month_key = dt.strftime('%Y-%m')
-        transactions.append({
-            'date': dt.date().isoformat(),
-            'month': month_key,
-            'description': desc[:100],
-            'gross_amount': round(abs(amount), 2),
-        })
-
-    return transactions
-
-def categorize_expense(description):
-    """
-    Categorizes each transaction into logical buckets.
-    Uses keyword matching for automatic categorization.
-    """
-    if not description:
-        return 'Other'
-    
-    text = description.lower()
-    categories = {
-        'Food & Groceries': [
-            'tesco', 'lidl', 'supervalu', 'dunnes', 'eurasia', 'supermarket',
-            'spar', 'centra', 'aldi', 'marks & spencer', 'm&s food'
-        ],
-        'Transport': [
-            'transport for ireland', 'tfi', 'leap', 'bus', 'luas', 'dart',
-            'nta', 'dublin bus', 'irish rail', 'taxi', 'uber', 'lyft', 'bolt'
-        ],
-        'Shopping': [
-            'penneys', 'primark', 'mr price', 'euro giant', 'euro store',
-            'zara', 'h&m', 'next', 'new look', 'tk maxx', 'dunnes stores'
-        ],
-        'Subscriptions': [
-            'netflix', 'spotify', 'apple.com', 'apple music', 'subscription',
-            'amazon prime', 'disney+', 'youtube premium', '48months'
-        ],
-        'Snacks & Dining': [
-            'five guys', 'burger king', 'mcdonalds', "mcdonald's", 'kfc',
-            'supermacs', 'subway', 'starbucks', 'costa', 'insomnia',
-            'cafe', 'bakehouse', 'restaurant', 'pizza', 'nandos'
-        ],
-        'Bills & Utilities': [
-            'rent', 'electric', 'electricity', 'gas', 'eir', 'vodafone',
-            'three', 'sky', 'virgin media', 'utility', 'sse airtricity'
-        ],
-        'Health & Pharmacy': [
-            'pharmacy', 'chemist', 'boots', 'mccabes', 'lloyds pharmacy',
-            'hospital', 'doctor', 'dentist', 'medical'
-        ]
-    }
-    
-    for category, keywords in categories.items():
-        if any(keyword in text for keyword in keywords):
-            return category
-    
-    return 'Other'
-
-# =============== TYPE CONVERSIONS AND RESPONSE HELPERS ===============
-
 def convert_floats_to_decimal(obj):
-    """Recursively converts all floats to Decimals for DynamoDB."""
     if isinstance(obj, dict):
         return {k: convert_floats_to_decimal(v) for k, v in obj.items()}
     elif isinstance(obj, list):
@@ -553,7 +305,6 @@ def convert_floats_to_decimal(obj):
     return obj
 
 def convert_decimal_to_float(obj):
-    """Recursively converts Decimals back to floats for JSON serialization."""
     if isinstance(obj, dict):
         return {k: convert_decimal_to_float(v) for k, v in obj.items()}
     elif isinstance(obj, list):
@@ -563,10 +314,6 @@ def convert_decimal_to_float(obj):
     return obj
 
 def success_response(data, status_code=200):
-    """
-    Helper to build a standard HTTP/JSON success response.
-    Includes CORS headers for cross-origin requests.
-    """
     return {
         'statusCode': status_code,
         'headers': {
@@ -579,7 +326,4 @@ def success_response(data, status_code=200):
     }
 
 def error_response(message, status_code=500):
-    """
-    Helper to build a standard HTTP/JSON error response.
-    """
     return success_response({'error': message}, status_code)
