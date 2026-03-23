@@ -1,5 +1,5 @@
 let config = null;
-const S3_BUCKET = "invoice-management-bucket-prajwal-nci";
+const S3_BUCKET = "invoice-management-bucket-prajwalk-nci";
 let currentAnalysisData = null;
 let currentFileName = '';
 let lastAnalysisData = { bucket: '', key: '', country: '' };

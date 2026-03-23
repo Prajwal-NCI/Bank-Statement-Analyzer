@@ -2,7 +2,7 @@ let config = null;
 
 async function loadConfig() {
   try {
-    const response = await fetch('/api/config');
+    const response = await fetch('./config.json');
     if (!response.ok) throw new Error('Config load failed');
     config = await response.json();
     console.log('Config loaded:', config);
@@ -45,7 +45,6 @@ function showResetPassword() {
   hideStatus('forgotStatus');
 }
 
-// Login
 document.getElementById('loginBtn').onclick = async function () {
   const email = document.getElementById('loginEmail').value.trim();
   const password = document.getElementById('loginPassword').value;
@@ -103,7 +102,6 @@ document.getElementById('loginBtn').onclick = async function () {
   }
 };
 
-// this part will send code for forgot password
 document.getElementById('sendCodeBtn').onclick = async function () {
   const email = document.getElementById('forgotEmail').value.trim();
   const btn = this;
@@ -154,7 +152,6 @@ document.getElementById('sendCodeBtn').onclick = async function () {
     btn.textContent = 'Send verification code';
   }
 };
-
 
 document.getElementById('resetPasswordBtn').onclick = async function () {
   const code = document.getElementById('verificationCode').value.trim();

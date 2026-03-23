@@ -1,0 +1,26 @@
+Metadata-Version: 2.4
+Name: invoice-tax-pkg-PrajwalNCI
+Version: 0.0.1
+Summary: A small Python package for basic VAT calculations on invoices
+Project-URL: Homepage, https://github.com/Prajwal-NCI/invoice_tax_lib.git
+Author-email: Prajwal Kate <x24194867@student.ncirl.ie>
+License-File: LICENSE
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Classifier: Programming Language :: Python :: 3
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown
+
+# invoice-tax-pkg
+
+A small Python package for basic VAT calculations on invoice amounts.
+
+This package was created as part of my MSc Cloud Computing (Cloud Platform Programming) project at NCI. It is designed to be simple and easy to reuse in my cloud-based invoice management application.
+
+## Features
+
+- Calculate VAT and gross amount from a net amount
+- Extract VAT and net amount from a gross amount
+- Support for a few example countries (IE, UK, DE) with default rate
+
+## Installation

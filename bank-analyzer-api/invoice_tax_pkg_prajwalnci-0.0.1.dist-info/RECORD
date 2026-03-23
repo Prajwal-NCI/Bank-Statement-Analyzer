@@ -1,0 +1,10 @@
+invoice_tax_pkg/__init__.py,sha256=eCG8RiLGr86O6CHbyfZjEkwH9pZPZhbFiKFxv686vZc,238
+invoice_tax_pkg/__pycache__/__init__.cpython-313.pyc,,
+invoice_tax_pkg/__pycache__/tax_calculator.cpython-313.pyc,,
+invoice_tax_pkg/tax_calculator.py,sha256=3I2u1H1A3Tp71ktQw1EJBjhK7FUkcDv5Jlxt4OdaUdI,4267
+invoice_tax_pkg_prajwalnci-0.0.1.dist-info/INSTALLER,sha256=zuuue4knoyJ-UwPPXg8fezS7VCrXJQrAP7zeNuwvFQg,4
+invoice_tax_pkg_prajwalnci-0.0.1.dist-info/METADATA,sha256=AXm2AyaSwAEcXR4c6SOsOfCC3x_zfL2uZXuBeNqogGM,992
+invoice_tax_pkg_prajwalnci-0.0.1.dist-info/RECORD,,
+invoice_tax_pkg_prajwalnci-0.0.1.dist-info/REQUESTED,sha256=47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU,0
+invoice_tax_pkg_prajwalnci-0.0.1.dist-info/WHEEL,sha256=qtCwoSJWgHk21S1Kb4ihdzI2rlJ1ZKaIurTj_ngOhyQ,87
+invoice_tax_pkg_prajwalnci-0.0.1.dist-info/licenses/LICENSE,sha256=dbB8Il0t7Y2OGBYFe_J8xmK0I9MlEqP_N_GjPk8H_zk,1088

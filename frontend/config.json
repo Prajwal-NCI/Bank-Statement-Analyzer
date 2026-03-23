@@ -1,0 +1,10 @@
+{
+  "api": {
+    "baseUrl": "https://wagryjbcqf.execute-api.us-east-1.amazonaws.com"
+  },
+  "cognito": {
+    "region": "us-east-1",
+    "userPoolId": "us-east-1_30Wambtgj",
+    "clientId": "450ju0fim5cnc1adnuc65ij404"
+  }
+}
